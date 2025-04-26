@@ -1,5 +1,4 @@
 import sys
-
 from dotenv import load_dotenv
 from langchain_core.messages import HumanMessage
 from langgraph.graph import END, StateGraph
@@ -146,6 +145,8 @@ if __name__ == "__main__":
     parser.add_argument("--show-reasoning", action="store_true", help="Show reasoning from each agent")
     parser.add_argument("--show-agent-graph", action="store_true", help="Show the agent graph")
     parser.add_argument("--ollama", action="store_true", help="Use Ollama for local LLM inference")
+    parser.add_argument("--all-analysts", action="store_true", help="Use all analysts instead of selecting")
+    parser.add_argument("--model", type=str, help="Use a specific model for the hedge fund")
 
     args = parser.parse_args()
 
@@ -154,27 +155,44 @@ if __name__ == "__main__":
 
     # Select analysts
     selected_analysts = None
-    choices = questionary.checkbox(
-        "Select your AI analysts.",
-        choices=[questionary.Choice(display, value=value) for display, value in ANALYST_ORDER],
-        instruction="\n\nInstructions: \n1. Press Space to select/unselect analysts.\n2. Press 'a' to select/unselect all.\n3. Press Enter when done to run the hedge fund.\n",
-        validate=lambda x: len(x) > 0 or "You must select at least one analyst.",
-        style=questionary.Style(
-            [
-                ("checkbox-selected", "fg:green"),
-                ("selected", "fg:green noinherit"),
-                ("highlighted", "noinherit"),
-                ("pointer", "noinherit"),
-            ]
-        ),
-    ).ask()
+    if args.all_analysts:
+        # Extract only the keys (values) when all analysts are selected
+        selected_analysts = [value for display, value in ANALYST_ORDER]
+        # We can use ANALYST_ORDER directly for printing display names
+        display_choices = ANALYST_ORDER
+    else:
+        choices = questionary.checkbox(
+            "Select your AI analysts.",
+            choices=[questionary.Choice(display, value=value) for display, value in ANALYST_ORDER],
+            instruction="\n\nInstructions: \n1. Press Space to select/unselect analysts.\n2. Press 'a' to select/unselect all.\n3. Press Enter when done to run the hedge fund.\n",
+            validate=lambda x: len(x) > 0 or "You must select at least one analyst.",
+            style=questionary.Style(
+                [
+                    ("checkbox-selected", "fg:green"),
+                    ("selected", "fg:green noinherit"),
+                    ("highlighted", "noinherit"),
+                    ("pointer", "noinherit"),
+                ]
+            ),
+        ).ask()
 
-    if not choices:
-        print("\n\nInterrupt received. Exiting...")
+        if not choices:
+            print("\n\nInterrupt received. Exiting...")
+            sys.exit(0)
+        else:
+            # Store the selected keys
+            selected_analysts = choices
+            # Create a list of tuples for display names matching the selected keys
+            display_choices = [item for item in ANALYST_ORDER if item[1] in selected_analysts]
+
+    if not selected_analysts:
+        # This case should ideally not be reached if questionary validation works
+        # or if --all-analysts is used, but added for safety.
+        print("\n\nNo analysts selected or interrupt received. Exiting...")
         sys.exit(0)
     else:
-        selected_analysts = choices
-        print(f"\nSelected analysts: {', '.join(Fore.GREEN + choice.title().replace('_', ' ') + Style.RESET_ALL for choice in choices)}\n")
+        # Print the display names correctly using the first element of the tuple
+        print(f"\nSelected analysts: {', '.join(Fore.GREEN + display_name + Style.RESET_ALL for display_name, value in display_choices)}\n")
 
     # Select LLM model based on whether Ollama is being used
     model_choice = None
@@ -182,20 +200,22 @@ if __name__ == "__main__":
 
     if args.ollama:
         print(f"{Fore.CYAN}Using Ollama for local LLM inference.{Style.RESET_ALL}")
-
-        # Select from Ollama-specific models
-        model_choice = questionary.select(
-            "Select your Ollama model:",
-            choices=[questionary.Choice(display, value=value) for display, value, _ in OLLAMA_LLM_ORDER],
-            style=questionary.Style(
-                [
-                    ("selected", "fg:green bold"),
-                    ("pointer", "fg:green bold"),
-                    ("highlighted", "fg:green"),
-                    ("answer", "fg:green bold"),
-                ]
-            ),
-        ).ask()
+        if args.model:
+            model_choice = args.model
+        else:
+            # Select from Ollama-specific models
+            model_choice = questionary.select(
+                "Select your Ollama model:",
+                choices=[questionary.Choice(display, value=value) for display, value, _ in OLLAMA_LLM_ORDER],
+                style=questionary.Style(
+                    [
+                        ("selected", "fg:green bold"),
+                        ("pointer", "fg:green bold"),
+                        ("highlighted", "fg:green"),
+                        ("answer", "fg:green bold"),
+                    ]
+                ),
+            ).ask()
 
         if not model_choice:
             print("\n\nInterrupt received. Exiting...")

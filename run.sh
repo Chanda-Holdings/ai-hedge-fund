@@ -14,6 +14,8 @@ show_help() {
   echo "  --margin-requirement RATIO  Margin requirement ratio (default: 0.0)"
   echo "  --ollama            Use Ollama for local LLM inference"
   echo "  --show-reasoning    Show reasoning from each agent"
+  echo "  --all-analysts      Use all analysts for the hedge fund"
+  echo "  --model MODEL       Use a specific model for the hedge fund"
   echo ""
   echo "Commands:"
   echo "  main                Run the main hedge fund application"
@@ -75,6 +77,14 @@ while [[ $# -gt 0 ]]; do
     --show-reasoning)
       SHOW_REASONING="--show-reasoning"
       shift
+      ;;
+    --all-analysts)
+      ALL_ANALYSTS="--all-analysts"
+      shift
+      ;;
+    --model)
+      MODEL_NAME="$2"
+      shift 2
       ;;
     main|backtest|build|help|compose|ollama)
       COMMAND="$1"
@@ -294,10 +304,15 @@ if [ -n "$USE_OLLAMA" ]; then
   
   # Use the appropriate service based on command and reasoning flag
   if [ "$COMMAND" = "main" ]; then
+    model_arg=""
+    if [ -n "$MODEL_NAME" ]; then
+      model_arg="--model $MODEL_NAME"
+    fi
     if [ -n "$SHOW_REASONING" ]; then
-      $COMPOSE_CMD $GPU_CONFIG run --rm hedge-fund-reasoning python src/main.py --ticker $TICKER $COMMAND_OVERRIDE $SHOW_REASONING --ollama
+      $COMPOSE_CMD $GPU_CONFIG run --rm hedge-fund-reasoning python src/main.py --ticker $TICKER $COMMAND_OVERRIDE $SHOW_REASONING --ollama $model_arg
     else
-      $COMPOSE_CMD $GPU_CONFIG run --rm hedge-fund-ollama python src/main.py --ticker $TICKER $COMMAND_OVERRIDE --ollama
+      echo "$COMPOSE_CMD $GPU_CONFIG run --rm hedge-fund-ollama python src/main.py --ticker $TICKER $COMMAND_OVERRIDE $ALL_ANALYSTS --ollama $model_arg"
+      $COMPOSE_CMD $GPU_CONFIG run --rm hedge-fund-ollama python src/main.py --ticker $TICKER $COMMAND_OVERRIDE $ALL_ANALYSTS --ollama $model_arg
     fi
   elif [ "$COMMAND" = "backtest" ]; then
     $COMPOSE_CMD $GPU_CONFIG run --rm backtester-ollama python src/backtester.py --ticker $TICKER $COMMAND_OVERRIDE $SHOW_REASONING --ollama

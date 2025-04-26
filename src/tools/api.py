@@ -2,6 +2,7 @@ import datetime
 import os
 import pandas as pd
 import requests
+from .FinancialModelingPrep import FMP
 
 from data.cache import get_cache
 from data.models import (
@@ -20,10 +21,14 @@ from data.models import (
 
 # Global cache instance
 _cache = get_cache()
+total_cost = 0
+fmp = FMP(os.environ.get("FMP_API_KEY"))
 
 
 def get_prices(ticker: str, start_date: str, end_date: str) -> list[Price]:
     """Fetch price data from cache or API."""
+    global total_cost
+    total_cost += 0.01
     # Check cache first
     if cached_data := _cache.get_prices(ticker):
         # Filter cached data by date range and convert to Price objects
@@ -32,18 +37,30 @@ def get_prices(ticker: str, start_date: str, end_date: str) -> list[Price]:
             return filtered_data
 
     # If not in cache or no data in range, fetch from API
-    headers = {}
-    if api_key := os.environ.get("FINANCIAL_DATASETS_API_KEY"):
-        headers["X-API-KEY"] = api_key
+    start_date = datetime.datetime.strptime(start_date, "%Y-%m-%d")
+    end_date = datetime.datetime.strptime(end_date, "%Y-%m-%d")
+    print(start_date, end_date)
+    prices = fmp.historical_prices_raw(ticker, start_date, end_date)
+    print(prices)
+    if not prices:
+        return []
+    # # Parse response with Pydantic model
+    # price_response = PriceResponse(**response.json())
+    # prices = price_response.prices
 
-    url = f"https://api.financialdatasets.ai/prices/?ticker={ticker}&interval=day&interval_multiplier=1&start_date={start_date}&end_date={end_date}"
-    response = requests.get(url, headers=headers)
-    if response.status_code != 200:
-        raise Exception(f"Error fetching data: {ticker} - {response.status_code} - {response.text}")
+    # headers = {}
+    # if api_key := os.environ.get("FINANCIAL_DATASETS_API_KEY"):
+    #     headers["X-API-KEY"] = api_key
 
-    # Parse response with Pydantic model
-    price_response = PriceResponse(**response.json())
-    prices = price_response.prices
+    # url = f"https://api.financialdatasets.ai/prices/?ticker={ticker}&interval=day&interval_multiplier=1&start_date={start_date}&end_date={end_date}"
+    # response = requests.get(url, headers=headers)
+    # if response.status_code != 200:
+    #     raise Exception(f"Error fetching data: {ticker} - {response.status_code} - {response.text}")
+
+    # print(response.json())
+    # # Parse response with Pydantic model
+    # price_response = PriceResponse(**response.json())
+    # prices = price_response.prices
 
     if not prices:
         return []
@@ -60,6 +77,8 @@ def get_financial_metrics(
     limit: int = 10,
 ) -> list[FinancialMetrics]:
     """Fetch financial metrics from cache or API."""
+    global total_cost
+    total_cost += 0.02
     # Check cache first
     if cached_data := _cache.get_financial_metrics(ticker):
         # Filter cached data by date and limit
@@ -113,6 +132,8 @@ def search_line_items(
         "period": period,
         "limit": limit,
     }
+    global total_cost
+    total_cost += (0.01 * len(body))
     response = requests.post(url, headers=headers, json=body)
     if response.status_code != 200:
         raise Exception(f"Error fetching data: {ticker} - {response.status_code} - {response.text}")
@@ -133,6 +154,8 @@ def get_insider_trades(
     limit: int = 1000,
 ) -> list[InsiderTrade]:
     """Fetch insider trades from cache or API."""
+    global total_cost
+    total_cost += 0.02
     # Check cache first
     if cached_data := _cache.get_insider_trades(ticker):
         # Filter cached data by date range
@@ -196,6 +219,8 @@ def get_company_news(
     limit: int = 1000,
 ) -> list[CompanyNews]:
     """Fetch company news from cache or API."""
+    global total_cost
+    total_cost += 0.02
     # Check cache first
     if cached_data := _cache.get_company_news(ticker):
         # Filter cached data by date range
@@ -257,6 +282,8 @@ def get_market_cap(
     end_date: str,
 ) -> float | None:
     """Fetch market cap from the API."""
+    global total_cost
+    total_cost += 0.00
     # Check if end_date is today
     if end_date == datetime.datetime.now().strftime("%Y-%m-%d"):
         # Get the market cap from company facts API

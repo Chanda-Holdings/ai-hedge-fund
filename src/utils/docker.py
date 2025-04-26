@@ -33,6 +33,8 @@ def ensure_ollama_and_model(model_name: str, ollama_url: str) -> bool:
 def is_ollama_available(ollama_url: str) -> bool:
     """Check if Ollama service is available in Docker environment."""
     try:
+        ollama_url = "http://localhost:11434"
+        print("URL: ", ollama_url + "/api/version")
         response = requests.get(f"{ollama_url}/api/version", timeout=5)
         if response.status_code == 200:
             return True
