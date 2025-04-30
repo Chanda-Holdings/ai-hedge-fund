@@ -1,15 +1,11 @@
-import sys
-import pathlib
-sys.path.insert(0, str(pathlib.Path(__file__).parent))
-from FinancialModelingPrep import FMP # type: ignore
-
 import datetime
 import os
 import pandas as pd
 import requests
+from FinancialModelingPrep import FMP
 from dotenv import load_dotenv
-from data.cache import get_cache
-from data.models import (
+from src.data.cache import get_cache
+from src.data.models import (
     CompanyNews,
     FinancialMetrics,
     Price,
@@ -18,6 +14,7 @@ from data.models import (
     LineItemResponse,
     InsiderTrade,
 )
+import sys
 
 load_dotenv()
 
@@ -30,6 +27,7 @@ def get_prices(ticker: str, start_date: str, end_date: str) -> list[Price]:
     """Fetch price data from cache or API."""
     # Check cache first
     if cached_data := _cache.get_prices(ticker):
+        print(cached_data)
         # Filter cached data by date range and convert to Price objects
         filtered_data = [Price(**price) for price in cached_data if start_date <= price["time"] <= end_date]
         if filtered_data:
@@ -293,13 +291,10 @@ def get_company_news(
         if filtered_data:
             return filtered_data
     
-    
+
+    start_date = datetime.datetime.strptime(start_date, "%Y-%m-%d")
     end_date = datetime.datetime.strptime(end_date, "%Y-%m-%d")
-    if start_date is None:
-        news = fmp.company_news([ticker], to=end_date)
-    else:
-        start_date = datetime.datetime.strptime(start_date, "%Y-%m-%d")
-        news = fmp.company_news([ticker], _from=start_date, to=end_date)
+    news = fmp.company_news([ticker], start_date, end_date)
     
     company_news = []
     for item in news:
@@ -312,7 +307,7 @@ def get_company_news(
             url=item.get('url', ''),
             sentiment=None
         ))
-    
+    # print(company_news)
     if not company_news:
         return []
 
@@ -342,7 +337,6 @@ def get_market_cap(
     df = df.reindex(date_range)
     df.ffill(inplace=True)
     df.bfill(inplace=True)
-    
     market_cap = df.loc[end_date, 'marketCap']
 
     return market_cap

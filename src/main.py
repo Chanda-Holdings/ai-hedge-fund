@@ -18,6 +18,7 @@ from datetime import datetime
 from dateutil.relativedelta import relativedelta
 from utils.visualize import save_graph_as_png
 import json
+import pytz
 
 # Load environment variables from .env file
 load_dotenv()
@@ -282,7 +283,8 @@ if __name__ == "__main__":
             raise ValueError("End date must be in YYYY-MM-DD format")
 
     # Set the start and end dates
-    end_date = args.end_date or datetime.now().strftime("%Y-%m-%d")
+    
+    end_date = datetime.now(pytz.timezone('America/New_York')).strftime("%Y-%m-%d")
     if not args.start_date:
         # Calculate 3 months before end_date
         end_date_obj = datetime.strptime(end_date, "%Y-%m-%d")

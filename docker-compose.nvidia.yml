@@ -8,13 +8,11 @@ services:
     command: python src/main.py --ticker AAPL,MSFT,NVDA
     environment:
       - PYTHONUNBUFFERED=1
-      - OLLAMA_BASE_URL=http://host.docker.internal:11434
-      - OLLAMA_HOST=host.docker.internal
+      - OLLAMA_BASE_URL=http://localhost:11434
+      - OLLAMA_HOST=localhost
     tty: true
     stdin_open: true
     network_mode: "host"
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
 
   hedge-fund-reasoning:
     build: .
@@ -24,13 +22,11 @@ services:
     command: python src/main.py --ticker AAPL,MSFT,NVDA --show-reasoning
     environment:
       - PYTHONUNBUFFERED=1
-      - OLLAMA_BASE_URL=http://host.docker.internal:11434
-      - OLLAMA_HOST=host.docker.internal
+      - OLLAMA_BASE_URL=http://localhost:11434
+      - OLLAMA_HOST=localhost
     tty: true
     stdin_open: true
     network_mode: "host"
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
 
   hedge-fund-ollama:
     build: .
@@ -40,13 +36,11 @@ services:
     command: python src/main.py --ticker AAPL,MSFT,NVDA --ollama
     environment:
       - PYTHONUNBUFFERED=1
-      - OLLAMA_BASE_URL=http://host.docker.internal:11434
-      - OLLAMA_HOST=host.docker.internal
+      - OLLAMA_BASE_URL=http://localhost:11434
+      - OLLAMA_HOST=localhost
     tty: true
     stdin_open: true
     network_mode: "host"
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
 
   backtester:
     build: .
@@ -56,13 +50,11 @@ services:
     command: python src/backtester.py --ticker AAPL,MSFT,NVDA
     environment:
       - PYTHONUNBUFFERED=1
-      - OLLAMA_BASE_URL=http://host.docker.internal:11434
-      - OLLAMA_HOST=host.docker.internal
+      - OLLAMA_BASE_URL=http://localhost:11434
+      - OLLAMA_HOST=localhost
     tty: true
     stdin_open: true
     network_mode: "host"
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
 
   backtester-ollama:
     build: .
@@ -72,13 +64,11 @@ services:
     command: python src/backtester.py --ticker AAPL,MSFT,NVDA --ollama
     environment:
       - PYTHONUNBUFFERED=1
-      - OLLAMA_BASE_URL=http://host.docker.internal:11434
-      - OLLAMA_HOST=host.docker.internal
+      - OLLAMA_BASE_URL=http://localhost:11434
+      - OLLAMA_HOST=localhost
     tty: true
     stdin_open: true
     network_mode: "host"
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
 
 volumes:
   ollama_data: 

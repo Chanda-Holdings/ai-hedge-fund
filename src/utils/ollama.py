@@ -284,10 +284,10 @@ def download_model(model_name: str) -> bool:
 def ensure_ollama_and_model(model_name: str) -> bool:
     """Ensure Ollama is installed, running, and the requested model is available.
     When called from main.py/backtester.py with --ollama flag, we assume
-    we need to connect via HTTP, likely to host.docker.internal.
+    we need to connect via HTTP, likely to localhost.
     """
     # Hardcode the URL assumed for Docker communication
-    ollama_url = "http://host.docker.internal:11434" 
+    ollama_url = "http://localhost:11434" 
     
     print(f"{Fore.CYAN}Checking Ollama availability at {ollama_url}...{Style.RESET_ALL}")
     # Use the utility functions from the docker module (which use HTTP requests)
@@ -297,7 +297,7 @@ def ensure_ollama_and_model(model_name: str) -> bool:
 def delete_model(model_name: str) -> bool:
     """Delete a locally downloaded Ollama model via HTTP API."""
     # Hardcode the URL assumed for Docker communication
-    ollama_url = "http://host.docker.internal:11434" 
+    ollama_url = "http://localhost:11434" 
     return docker.delete_model(model_name, ollama_url)
 
 

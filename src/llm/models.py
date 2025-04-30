@@ -214,7 +214,7 @@ def get_model(model_name: str, model_provider: ModelProvider) -> ChatOpenAI | Ch
     elif model_provider == ModelProvider.OLLAMA:
         # For Ollama, we use a base URL instead of an API key\
         # due to issues reading the environment variable correctly here.
-        base_url = "http://172.17.0.1:11434"
+        base_url = "http://localhost:11434"
         return ChatOllama(
             model=model_name, 
             base_url=base_url,

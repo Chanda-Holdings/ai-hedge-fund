@@ -1,0 +1,2 @@
+./run.sh build
+./run.sh --ticker AAPL --ollama --all-analysts main --model gemma3:4b
