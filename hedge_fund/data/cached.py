@@ -48,6 +48,19 @@ class CachedDataClient:
         self._dir = Path(cache_dir)
         self._refresh = refresh
 
+    # Context management delegates to the wrapped client, so a cached client
+    # can stand wherever a raw one does (e.g. `with make_data_client() as fd`).
+    def __enter__(self) -> CachedDataClient:
+        return self
+
+    def __exit__(self, *args) -> None:
+        self.close()
+
+    def close(self) -> None:
+        close = getattr(self._client, "close", None)
+        if close is not None:
+            close()
+
     # ------------------------------------------------------------------
     # DataClient protocol
     # ------------------------------------------------------------------
