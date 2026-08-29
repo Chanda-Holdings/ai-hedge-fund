@@ -1,5 +1,10 @@
 [
   {
+    "display_name": "Qwen3.8 27B (local)",
+    "model_name": "qwen3.8:27b-16k",
+    "provider": "OpenAI"
+  },
+  {
     "display_name": "Opus 5",
     "model_name": "claude-opus-5",
     "provider": "Anthropic"

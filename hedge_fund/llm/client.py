@@ -69,7 +69,13 @@ class ChatLLM:
     def complete(self, system: str, user: str) -> str:
         messages = [("system", system), ("human", user)]
         if self._on_token is None:
-            return _flatten(self._chat.invoke(messages).content)
+            text = _flatten(self._chat.invoke(messages).content)
+            if not text.strip():
+                # A reasoning model occasionally stops after its thinking
+                # block with no answer text. Empty is never a valid response
+                # here, so one re-sample is safe for every provider.
+                text = _flatten(self._chat.invoke(messages).content)
+            return text
 
         # Streaming chunks concatenate into the response, so they flatten
         # without a separator — the "\n" that joins whole-message blocks would
@@ -85,8 +91,8 @@ class ChatLLM:
 
 def make_llm(
     model: str | None = None,
-    timeout: float = 60.0,
-    max_tokens: int = 4096,
+    timeout: float | None = None,
+    max_tokens: int | None = None,
     on_token: TokenListener = None,
 ) -> ChatLLM:
     """Build the client for a model id, routed by the registry's provider.
@@ -94,8 +100,18 @@ def make_llm(
     The id comes from the caller, else HEDGE_FUND_LLM_MODEL, else DEFAULT_MODEL — the
     same seam the TUI's picker writes to. Raises with the name of the missing
     environment variable, because that is the only thing the user can act on.
+
+    The timeout comes from the caller, else HEDGE_FUND_LLM_TIMEOUT, else 60
+    seconds. Hosted providers fit comfortably in 60; a local model that has
+    to load into VRAM and think first may not, and the env var is the fix.
     """
     model = model or os.environ.get("HEDGE_FUND_LLM_MODEL") or DEFAULT_MODEL
+    if timeout is None:
+        timeout = float(os.environ.get("HEDGE_FUND_LLM_TIMEOUT", "60"))
+    if max_tokens is None:
+        # A reasoning model spends the same budget on thinking before the
+        # answer — a local thinker may need more than a hosted default.
+        max_tokens = int(os.environ.get("HEDGE_FUND_LLM_MAX_TOKENS", "4096"))
     provider = provider_for(model)
     if provider is None:
         # Unlisted ids still work: a model newer than the registry should not
@@ -116,7 +132,8 @@ def make_llm(
     elif provider == "OpenAI":
         from langchain_openai import ChatOpenAI
         chat = ChatOpenAI(model=model, api_key=api_key, timeout=timeout,
-                          max_retries=1, base_url=os.getenv("OPENAI_API_BASE"))
+                          max_retries=1, max_tokens=max_tokens,
+                          base_url=os.getenv("OPENAI_API_BASE"))
     elif provider == "DeepSeek":
         from langchain_deepseek import ChatDeepSeek
         chat = ChatDeepSeek(model=model, api_key=api_key, timeout=timeout,
@@ -135,6 +152,7 @@ def make_llm(
         from langchain_openai import ChatOpenAI
         chat = ChatOpenAI(
             model=model, api_key=api_key, timeout=timeout, max_retries=1,
+            max_tokens=max_tokens,
             base_url=(os.getenv("MOONSHOT_BASE_URL")
                       or "https://api.moonshot.ai/v1"))
     else:  # pragma: no cover - SUPPORTED_PROVIDERS is checked above
