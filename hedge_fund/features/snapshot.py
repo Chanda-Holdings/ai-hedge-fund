@@ -98,7 +98,8 @@ class FundamentalsSnapshot(BaseModel):
             f"  Book value/share CAGR: {_fmt(self.bvps_cagr)}",
             f"  Debt/equity (latest): {_fmt(self.debt_to_equity_latest)}",
             "",
-            "History (trailing-twelve-month periods, newest first):",
+            "History, newest first. ROE, EPS and FCF/sh are trailing-twelve-month; "
+            "mktcap, BVPS, D/E and curr are as of the period end:",
             "period | filed | mktcap | P/E | ROE | gross_m | op_m | net_m | D/E "
             "| curr | rev_gr | EPS | BVPS | FCF/sh",
         ]
