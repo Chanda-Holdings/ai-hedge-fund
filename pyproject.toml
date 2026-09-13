@@ -28,6 +28,7 @@ numpy = "^1.24.0"
 python-dotenv = "1.0.0"
 matplotlib = "^3.9.2"
 requests = "^2.32.0"
+fmpsdk = {git = "https://github.com/Chanda-Holdings/fmpsdk.git", rev = "75cc471abfd97b3f1719bc590a86f2ec523cbba7"}
 rich = "^14.2.0"
 pydantic = "^2.4.2"
 scipy = "^1.11.0"
