@@ -1414,7 +1414,7 @@ pyflakes = ">=3.1.0,<3.2.0"
 
 [[package]]
 name = "fmpsdk"
-version = "20260826.0"
+version = "20261104.0"
 description = ""
 optional = false
 python-versions = "*"
@@ -1429,8 +1429,8 @@ requests = "*"
 [package.source]
 type = "git"
 url = "https://github.com/Chanda-Holdings/fmpsdk.git"
-reference = "75cc471abfd97b3f1719bc590a86f2ec523cbba7"
-resolved_reference = "75cc471abfd97b3f1719bc590a86f2ec523cbba7"
+reference = "61c232e9910644640629bc6ec5307595b7364896"
+resolved_reference = "61c232e9910644640629bc6ec5307595b7364896"
 
 [[package]]
 name = "fonttools"
@@ -5384,4 +5384,4 @@ x402 = ["x402"]
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.11"
-content-hash = "83537f6758787ff06b348a35fe1e6e9f5a19f9d9c41a823f9730d1484d901908"
+content-hash = "703a9a47edde8ee1bd5f6e77f4e8102236ff22f95087efe933934015f6d3ffd5"
