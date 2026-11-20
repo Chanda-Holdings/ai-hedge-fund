@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 from typing import Callable
 
@@ -43,6 +43,10 @@ from hedge_fund.paths import CACHE_DIR
 DEFAULT_CACHE_DIR = CACHE_DIR / "data"
 SAME_DAY_TTL = 600  # seconds an answer about an unfinished day stays fresh
 VOCABULARY_TTL = 86_400  # seconds the screener's field list stays fresh; it changes rarely
+
+
+def _today() -> str:
+    return date.today().isoformat()
 
 
 class CachedDataClient:
@@ -112,9 +116,11 @@ class CachedDataClient:
         )
 
     def get_earnings_history(self, ticker, limit=12):
+        # The request has no date, but each report adds a row: an entry keyed
+        # on the ticker alone froze the history on 2026-08-29. Fetch daily.
         return self._cached_list(
             "get_earnings_history", EarningsRecord,
-            {"ticker": ticker, "limit": limit},
+            {"ticker": ticker, "limit": limit, "fetched_on": _today()},
             lambda: self._client.get_earnings_history(ticker, limit),
         )
 

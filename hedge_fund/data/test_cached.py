@@ -238,3 +238,27 @@ def test_a_screen_is_cached_by_date_and_filters_and_a_past_date_is_final(tmp_pat
     Clock.now_at += timedelta(seconds=cached.VOCABULARY_TTL + 1)
     fd.screener_fields()
     assert inner.calls == 7
+
+
+class EarningsClient:
+    def __init__(self):
+        self.calls = 0
+
+    def get_earnings_history(self, ticker, limit=12):
+        self.calls += 1
+        return []
+
+
+def test_earnings_history_refetches_on_a_new_day(tmp_path, monkeypatch):
+    from hedge_fund.data import cached
+
+    inner = EarningsClient()
+    client = CachedDataClient(inner, cache_dir=tmp_path)
+    monkeypatch.setattr(cached, "_today", lambda: "2026-11-20")
+    client.get_earnings_history("GE", limit=8)
+    client.get_earnings_history("GE", limit=8)
+    assert inner.calls == 1
+
+    monkeypatch.setattr(cached, "_today", lambda: "2026-11-21")
+    client.get_earnings_history("GE", limit=8)
+    assert inner.calls == 2
