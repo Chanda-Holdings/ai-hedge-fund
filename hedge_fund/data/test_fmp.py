@@ -5,7 +5,7 @@ import requests
 from fmpsdk.exceptions import InvalidAPIKeyException, RateLimitExceededException
 
 from hedge_fund.data import make_data_client
-from hedge_fund.data.fmp import FMPClient, FMPClientError
+from hedge_fund.data.fmp import _TRANSIENT_DELAYS, FMPClient, FMPClientError
 
 
 def make_client(payloads: dict) -> FMPClient:
@@ -229,7 +229,8 @@ def test_rate_limit_surfaces_as_client_error():
     requests.ConnectionError("dns failure"),
     Exception("Resource not found"),
 ])
-def test_infrastructure_failures_raise_client_error(error):
+def test_infrastructure_failures_raise_client_error(monkeypatch, error):
+    monkeypatch.setattr("hedge_fund.data.fmp.time.sleep", lambda s: None)
     client = FMPClient(api_key="test")
 
     def company_profile(apikey, **params):
@@ -237,6 +238,51 @@ def test_infrastructure_failures_raise_client_error(error):
 
     with pytest.raises(FMPClientError):
         client._call(company_profile)
+
+
+_BAD_GATEWAY = Exception("API request failed with status code 502: Bad Gateway")
+
+
+def _flaky(errors, result):
+    """An fmpsdk endpoint that raises each error in turn, then returns result."""
+    calls = []
+
+    def financial_ratios(apikey, **params):
+        calls.append(params)
+        if len(calls) <= len(errors):
+            raise errors[len(calls) - 1]
+        return result
+
+    return financial_ratios, calls
+
+
+@pytest.mark.parametrize("error", [_BAD_GATEWAY, requests.ConnectionError("reset")])
+def test_transient_failure_is_retried(monkeypatch, error):
+    """One Bad Gateway must not end a cycle with hours of LLM work behind it."""
+    monkeypatch.setattr("hedge_fund.data.fmp.time.sleep", lambda s: None)
+    fn, calls = _flaky([error, error], [])
+
+    assert FMPClient(api_key="test")._call(fn) == []
+    assert len(calls) == 3
+
+
+def test_persistent_server_error_raises_after_retries(monkeypatch):
+    monkeypatch.setattr("hedge_fund.data.fmp.time.sleep", lambda s: None)
+    fn, calls = _flaky([_BAD_GATEWAY] * 10, [])
+
+    with pytest.raises(FMPClientError) as exc_info:
+        FMPClient(api_key="test")._call(fn)
+    assert exc_info.value.status_code == 502
+    assert len(calls) == len(_TRANSIENT_DELAYS) + 1
+
+
+def test_missing_resource_is_not_retried(monkeypatch):
+    monkeypatch.setattr("hedge_fund.data.fmp.time.sleep", lambda s: None)
+    fn, calls = _flaky([Exception("Resource not found. Status code: 404.")], [])
+
+    with pytest.raises(FMPClientError):
+        FMPClient(api_key="test")._call(fn)
+    assert len(calls) == 1
 
 
 def test_premium_response_object_raises():

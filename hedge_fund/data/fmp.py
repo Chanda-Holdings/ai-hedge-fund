@@ -5,8 +5,9 @@ genuinely does not exist; infrastructure failures raise. Select it with
 HEDGE_FUND_DATA_SOURCE=fmp (see make_data_client in hedge_fund/data/__init__.py).
 
 Every request goes through fmpsdk, which retries a 429 ten times at 20 second
-intervals before it raises. That backoff is why this module keeps no HTTP code
-of its own.
+intervals. fmpsdk does not retry a 5xx or a dropped connection, so _call retries
+those with backoff before it raises: one Bad Gateway must not end a cycle that
+has hours of LLM work behind it.
 
 Point-in-time correctness: FMP's metrics endpoints key rows by fiscal period
 end, which precedes public availability by weeks — using them directly would
@@ -15,9 +16,10 @@ row to its income statement's filingDate and filters on THAT. A row whose
 filing date is unknown is dropped: not provably public means not usable.
 
 Three deliberate approximations, documented here once:
-- Rows are quarterly, not trailing-twelve-month. Margins and ratios read the
-  same either way; growth rates are computed year-over-year in this module
-  (vs 4 quarters back) so seasonality does not masquerade as growth.
+- Rows are one per quarter. Margins and ratios read the same either way; ROE,
+  EPS and free cash flow per share are summed over the trailing four quarters,
+  and growth rates are computed year-over-year so seasonality does not
+  masquerade as growth.
 - The earnings endpoint gives an announcement date but no fiscal period end,
   so the period comes from the latest income statement that closed before the
   announcement. PEAD drops an event on filing-minus-period lag, so the period
@@ -32,7 +34,10 @@ end_date every tick, and the underlying filings change quarterly, not weekly.
 
 from __future__ import annotations
 
+import logging
 import os
+import re
+import time
 
 import fmpsdk
 import requests
@@ -68,6 +73,12 @@ _TYPED_ERRORS = (
     PremiumQueryParameterException,
     RateLimitExceededException,
 )
+
+_TRANSIENT_DELAYS = (5, 15, 30, 60, 120)
+# fmpsdk raises a 5xx as a bare Exception; the status lives only in its message.
+_SERVER_ERROR = re.compile(r"status code (5\d\d)")
+
+logger = logging.getLogger(__name__)
 
 
 class FMPClientError(Exception):
@@ -213,27 +224,35 @@ class FMPClient:
 
         fmpsdk reports trouble three ways — a typed exception, a bare Response
         for a premium endpoint, or a dict carrying "Error Message" — and each
-        one becomes FMPClientError so the fail-loud contract holds.
+        one becomes FMPClientError so the fail-loud contract holds. A 5xx or a
+        dropped connection is retried first; a 404 or a bad key is not.
         """
         name = getattr(fn, "__name__", str(fn))
-        try:
-            response = fn(apikey=self._api_key, **params)
-        except RateLimitExceededException as exc:
-            raise FMPClientError(
-                f"{name} rate limited (429) after fmpsdk exhausted its retries: {exc}",
-                status_code=429, path=name,
-            ) from exc
-        except _TYPED_ERRORS as exc:
-            raise FMPClientError(f"{name} failed: {exc}", path=name) from exc
-        except ValidationError as exc:
-            raise FMPClientError(
-                f"{name} returned rows that do not match the fmpsdk model: {exc}",
-                path=name,
-            ) from exc
-        except requests.RequestException as exc:
-            raise FMPClientError(f"request failed for {name}: {exc}", path=name) from exc
-        except Exception as exc:  # noqa: BLE001 - every path here is an HTTP fetch
-            raise FMPClientError(f"{name} failed: {exc}", path=name) from exc
+        for delay in (*_TRANSIENT_DELAYS, None):
+            try:
+                response = fn(apikey=self._api_key, **params)
+                break
+            except RateLimitExceededException as exc:
+                raise FMPClientError(
+                    f"{name} rate limited (429) after fmpsdk exhausted its retries: {exc}",
+                    status_code=429, path=name,
+                ) from exc
+            except _TYPED_ERRORS as exc:
+                raise FMPClientError(f"{name} failed: {exc}", path=name) from exc
+            except ValidationError as exc:
+                raise FMPClientError(
+                    f"{name} returned rows that do not match the fmpsdk model: {exc}",
+                    path=name,
+                ) from exc
+            except (requests.ConnectionError, requests.Timeout) as exc:
+                _wait_or_raise(name, delay, exc, status_code=None)
+            except requests.RequestException as exc:
+                raise FMPClientError(f"request failed for {name}: {exc}", path=name) from exc
+            except Exception as exc:  # noqa: BLE001 - every path here is an HTTP fetch
+                server_error = _SERVER_ERROR.search(str(exc))
+                if server_error is None:
+                    raise FMPClientError(f"{name} failed: {exc}", path=name) from exc
+                _wait_or_raise(name, delay, exc, status_code=int(server_error.group(1)))
 
         status = getattr(response, "status_code", None)
         if status is not None:
@@ -373,3 +392,13 @@ def _yoy(current, prior) -> float | None:
     if current is None or not prior:
         return None
     return current / prior - 1
+
+
+def _wait_or_raise(name: str, delay: int | None, exc: Exception, status_code: int | None) -> None:
+    if delay is None:
+        raise FMPClientError(
+            f"{name} failed after {len(_TRANSIENT_DELAYS)} retries: {exc}",
+            status_code=status_code, path=name,
+        ) from exc
+    logger.warning("%s transient failure, retrying in %ss: %s", name, delay, exc)
+    time.sleep(delay)
