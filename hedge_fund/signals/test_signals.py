@@ -96,6 +96,20 @@ class TestPEADPredict:
         sig = PEADModel().predict("TEST", "2026-04-13", fd)
         assert sig.value == 0.0
 
+    def test_a_wider_window_keeps_a_tuesday_report(self):
+        # The cycle runs on Sunday. A Tuesday report is 5 days old.
+        fd = MockFDClient([_rec("2026-10-26", "2026-11-17", "BEAT")])
+        assert PEADModel().predict("TEST", "2026-11-22", fd).value == 0.0
+        wide = PEADModel(signal_window_days=7)
+        assert wide.predict("TEST", "2026-11-22", fd).value == 1.0
+
+    def test_a_longer_cutoff_keeps_a_year_end_report(self):
+        # DIS: the fiscal year ended 2026-10-03, and the report came 45 days later.
+        fd = MockFDClient([_rec("2026-10-03", "2026-11-17", "BEAT")])
+        assert PEADModel().predict("TEST", "2026-11-17", fd).value == 0.0
+        late = PEADModel(retrospective_cutoff_days=60)
+        assert late.predict("TEST", "2026-11-17", fd).value == 1.0
+
     def test_dedup_prefers_8k(self):
         # Same report period via 8-K and 10-Q; 8-K should be the chosen source
         fd = MockFDClient([

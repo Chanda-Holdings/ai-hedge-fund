@@ -46,10 +46,12 @@ class PEADModel(QuantModel):
         earnings_limit: int = 8,
         signal_window_days: int = 4,
         announcement_only: bool = True,
+        retrospective_cutoff_days: int = _RETROSPECTIVE_CUTOFF_DAYS,
     ) -> None:
         self._earnings_limit = earnings_limit
         self._signal_window_days = signal_window_days
         self._announcement_only = announcement_only
+        self._retrospective_cutoff_days = retrospective_cutoff_days
         # Cache earnings history per ticker — predict is called once per
         # trading day during a backtest, so we fetch each ticker only once.
         self._cache: dict[str, list[EarningsRecord]] = {}
@@ -131,9 +133,10 @@ class PEADModel(QuantModel):
             if self._announcement_only and r.source_type != "8-K":
                 continue
 
-            # 45-day retrospective filter
+            # Retrospective filter. A large company has 60 days to file a
+            # year-end report, so a fresh one can come after 45 days.
             lag = (_parse_date(r.filing_date) - _parse_date(r.report_period)).days
-            if lag >= _RETROSPECTIVE_CUTOFF_DAYS:
+            if lag >= self._retrospective_cutoff_days:
                 continue
 
             # Highest-priority filing per period (8-K wins); earliest date
